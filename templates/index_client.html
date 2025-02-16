@@ -13,6 +13,8 @@
     </div>
 
     <script>
+        let lastMessage = '';
+
         window.onload = function(){
             sseListener();
         };
@@ -20,8 +22,22 @@
         function updateMessage(event) {
             const data = JSON.parse(event.data);
             const message = data.message !== undefined ? data.message : event.data;
-            document.getElementById('response').innerHTML = message;
-            console.log("Evento:", data);
+            
+            // Only make request if message has changed
+            if (message !== lastMessage) {
+            lastMessage = message;
+            fetch('/decode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                document.getElementById("response").innerHTML = "<p>" + data.message + "</p>";
+            })
+            .catch(error => console.error('Error:', error));
+            }
         }
 
         function sseListener(){
