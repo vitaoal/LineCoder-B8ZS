@@ -1,8 +1,11 @@
 from crypt_tools import *
 from b8zse import B8ZSEncoder
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
+from flask_cors import CORS
+import time
 
 app = Flask(__name__)
+CORS(app)
 encoder = B8ZSEncoder()
 key, iv = load_keys()
 
@@ -31,12 +34,20 @@ def submit():
     last_message = encoded_data
     return jsonify(response)
 
+# Endpoint SSE
 @app.route('/last_message', methods=['GET'])
 def get_last_message():
-    global last_message
-    if last_message is None:
-        return jsonify({'message': 'No message available'}), 404
-    return jsonify({'last_message': last_message})
+    def stream():
+        global last_message
+        while True:
+            if last_message is not None:
+                yield f"data: {last_message}\n\n"
+            else:
+                yield f"data: No new message"
+            time.sleep(1)
+                
+    return Response(stream(), mimetype='text/event-stream')
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

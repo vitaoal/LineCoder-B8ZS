@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LineCoder</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div id="response">
+        </div>
+    </div>
+
+    <script>
+        window.onload = function(){
+            sseListener();
+        };
+
+        function updateMessage(event) {
+            const data = JSON.parse(event.data);
+            const message = data.message !== undefined ? data.message : event.data;
+            document.getElementById('response').innerHTML = message;
+            console.log("Evento:", data);
+        }
+
+        function sseListener(){
+            const eventSource = new EventSource("http://127.0.0.1:5000/last_message");
+            eventSource.onmessage = updateMessage;
+        }
+    </script>
+
+</body>
+</html>
