@@ -16,43 +16,72 @@ class B8ZSEncoder:
                 encoded.append(0)
                 if zero_count == 8:
                     encoded = encoded[:-8]  # Remove os 8 zeros
-                    # Insere a violação de polaridade
+                    # Insere o padrão de substituição CORRETO
                     if self.last_polarity == 1:
-                        encoded += [1, 0, 0, 0, -1, 0, -1, 1]
+                        encoded += [0, 0, 0, 1, -1, 0, -1, 1]
                     else:
-                        encoded += [-1, 0, 0, 0, 1, 0, 1, -1]
+                        encoded += [0, 0, 0, -1, 1, 0, 1, -1]
                     zero_count = 0
-                    self.last_polarity *= -1
-        return encoded
+                    self.last_polarity *= -1  # Atualiza a polaridade
+        return ','.join(map(str, encoded))
 
 class B8ZSDecoder:
     @staticmethod
-    def decode(encoded_sequence):
+    def decode(encoded_sequence_str):
+        encoded_sequence = list(map(int, encoded_sequence_str.split(',')))
         decoded = []
         i = 0
+        n = len(encoded_sequence)
         
-        while i < len(encoded_sequence):
+        substitution_patterns = [
+            [0, 0, 0, 1, -1, 0, -1, 1],
+            [0, 0, 0, -1, 1, 0, 1, -1]
+        ]
+        
+        while i < n:
+            # Verifica se há espaço para um padrão de substituição (8 elementos)
+            if i + 8 <= n:
+                current_subseq = encoded_sequence[i:i+8]
+                if current_subseq in substitution_patterns:
+                    decoded.extend(['0'] * 8)
+                    i += 8
+                    continue
+            # Processa elementos individualmente
             if encoded_sequence[i] == 0:
-                # Contar zeros consecutivos
-                zeros = 0
-                while i < len(encoded_sequence) and encoded_sequence[i] == 0:
-                    zeros += 1
-                    i += 1
-                decoded.extend(['0'] * zeros)
+                decoded.append('0')
             else:
-                # Verificar padrão de violação (8 elementos)
-                if i + 7 < len(encoded_sequence):
-                    subsequence = encoded_sequence[i:i+8]
-                    # Padrões válidos de substituição
-                    if subsequence in [
-                        [1, 0, 0, 0, -1, 0, -1, 1],
-                        [-1, 0, 0, 0, 1, 0, 1, -1]
-                    ]:
-                        decoded.extend(['0'] * 8)
-                        i += 8
-                        continue
-                # Bit normal (1)
                 decoded.append('1')
-                i += 1
-                
+            i += 1
         return ''.join(decoded)
+    
+def main():
+    encoder = B8ZSEncoder()
+    decoder = B8ZSDecoder()
+
+    # Lista de testes com as strings a serem codificadas e decodificadas
+    test_cases = ["Lorem", "Ipsum", "sin dolor"]
+
+    for case in test_cases:
+        print("Entrada:", case)
+        # Converter cada caractere para uma string binária de 8 bits
+        binary_str = ''.join(format(ord(c), '08b') for c in case)
+        print("Binário:", binary_str)
+        encoded = encoder.encode(binary_str)
+        print("Codificado:", encoded)
+        decoded_binary = decoder.decode(encoded)
+        # Converter a string binária de volta para texto (cada 8 bits)
+        decoded_text = ''.join(chr(int(decoded_binary[i:i+8], 2)) for i in range(0, len(decoded_binary), 8))
+        print("Decodificado:", decoded_text)
+        print()
+    
+    # Teste com 8 zeros (binário: 00000000)
+    encoder = B8ZSEncoder()
+    binary_str = "00000000"
+    encoded = encoder.encode(binary_str)
+    print("Encoded:", encoded)  # Deve retornar: 0,0,0,1,-1,0,-1,1 (polaridade inicial +1)
+
+    decoded = B8ZSDecoder.decode(encoded)
+    print("Decoded:", decoded)  # Deve retornar: 00000000
+
+if __name__ == "__main__":
+    main()

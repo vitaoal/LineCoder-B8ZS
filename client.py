@@ -1,42 +1,124 @@
+# python
 from crypt_tools import *
-import requests
-import ast
 from b8zse import B8ZSDecoder  # [b8zse.py](b8zse.py)
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
+import socket
+import threading
+import PyQt5
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5 import QtGui, QtCore
+from PyQt5.QtGui import QCursor
 
-app = Flask(__name__)
-CORS(app)
-key, iv = load_keys()
+class MainWindow(QWidget):
+    new_message = pyqtSignal(str)
 
-@app.route('/')
-def index():
-    # Fazer uma pagina bonitinha pra exibir as msg
-    return render_template('index_client.html')
+    def __init__(self):
+        super().__init__()
+        self.key, self.iv = load_keys()
+        self.decoder = B8ZSDecoder()
+        self.client_socket = None
+        self.initUI()
+        self.new_message.connect(self.update_message)
 
-# Testando a api do server.py
-# A ideia é usar o script python apenas para decriptografar
-# a mensagem que chega no front, usar SSE para interação em
-# tempo real
-@app.route('/decode', methods=['POST'])
-def decode():
-    data = request.get_json()
-    encoded_message_str = data['message']  # Recebe a representação textual da lista
-    # Converte a string para uma lista real de inteiros
-    encoded_message = ast.literal_eval(encoded_message_str)
-    
-    # Decodifica o padrão B8ZS para recuperar a string binária original
-    binary_str = B8ZSDecoder.decode(encoded_message)
-    
-    # Separa a string binária em bytes (8 bits) e converte para um objeto bytes
-    encrypted_bytes = bytes(
-        int(binary_str[i:i+8], 2) for i in range(0, len(binary_str), 8)
-    )
-    
-    # Descriptografa a mensagem
-    decrypted_message = decrypt(encrypted_bytes, key, iv)
-    
-    return jsonify({'message': decrypted_message})
+    def initUI(self):
+        grid_layout = QGridLayout()
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+        # Group 1: Decodificar Mensagem
+        group1 = QGroupBox('')
+        group1_layout = QVBoxLayout()
+        group1_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        self.label = QLabel('Decodificar Mensagem:')
+        self.label.setStyleSheet("font-weight: bold; color: gainsboro; border: none;")
+        self.label_decoded = QLabel('Decoded Message')
+        self.label_decoded.setStyleSheet("color: gainsboro;")
+        self.text_input = QLineEdit()
+        group1_layout.addWidget(self.label)
+        group1_layout.addWidget(self.label_decoded)
+        group1.setLayout(group1_layout)
+
+        # Group 2: Conectar ao Servidor
+        group2 = QGroupBox('Conectar ao Servidor')
+        group2_layout = QVBoxLayout()
+        self.ip_input = QLineEdit()
+        self.ip_input.setPlaceholderText("IP do servidor")
+        self.port_input = QLineEdit()
+        self.port_input.setPlaceholderText("Porta")
+        self.connect_button = QPushButton("Conectar")
+        self.connect_button.clicked.connect(self.connectToServer)
+        self.server_msg_label = QLabel("Mensagens do servidor aparecerão aqui")
+        group2_layout.addWidget(self.ip_input)
+        group2_layout.addWidget(self.port_input)
+        group2_layout.addWidget(self.connect_button)
+        group2_layout.addWidget(self.server_msg_label)
+        group2.setLayout(group2_layout)
+
+        grid_layout.addWidget(group1, 0, 0)
+        grid_layout.addWidget(group2, 0, 1)
+        self.setLayout(grid_layout)
+
+        # Estilo
+        self.setStyleSheet("""
+            color: gainsboro; background-color: #202020;
+            border: 1px solid #565656; border-radius: 2px;
+        """)
+
+    def on_submit(self):
+        coded_str = self.text_input.text()  
+        # Exemplo de string codificada (0,1,-1...) em formato '0 1 0 -1...'
+        coded_list = list(map(int, coded_str.split()))
+        decoded_bin = self.decoder.decode(coded_list)
+        print(f"Decoded binary: {decoded_bin}")
+
+    def connectToServer(self):
+        ip = self.ip_input.text().strip()
+        port_str = self.port_input.text().strip()
+        try:
+            port = int(port_str)
+        except ValueError:
+            self.server_msg_label.setText("Porta inválida")
+            return
+        try:
+            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client_socket.connect((ip, port))
+            self.server_msg_label.setText("Conectado ao servidor!")
+            threading.Thread(target=self.listen_server, daemon=True).start()
+        except Exception as e:
+            self.server_msg_label.setText(f"Erro: {e}")
+
+    def listen_server(self):
+        buffer = ""
+        while True:
+            data = self.client_socket.recv(1024)
+            if not data:
+                break
+            buffer += data.decode()
+            # Processar todas as mensagens completas no buffer
+            while '\n' in buffer:
+                message, buffer = buffer.split('\n', 1)
+                decoded_bin = self.decoder.decode(message)
+                try:
+                    byte_array = bytearray()
+                    for i in range(0, len(decoded_bin), 8):
+                        byte_str = decoded_bin[i:i+8]
+                        if len(byte_str) < 8:
+                            continue  # Ou trate bytes incompletos
+                        byte_array.append(int(byte_str, 2))
+                    encrypted_bytes = bytes(byte_array)
+                    decrypted_message = decrypt(encrypted_bytes, self.key, self.iv)
+                    self.new_message.emit(decrypted_message)
+                    self.label_decoded.setText(decrypted_message)
+                except Exception as e:
+                    print(f"Erro ao processar mensagem: {e}")
+
+    def update_message(self, message):
+        self.server_msg_label.setText(message)
+
+def main():
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
+    app.exec_()
+
+if __name__ == "__main__":
+    main()
