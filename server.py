@@ -1,26 +1,40 @@
 import threading
 import socket
-from crypt_tools import *
 from b8zse import B8ZSEncoder
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-from PyQt5 import QtGui, QtCore
-from PyQt5.QtGui import QCursor
 
-host = "127.0.0.1"
+host = socket.gethostbyname(socket.gethostname())
 port = 65432
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind((host,port))
+server_socket.bind((host, port))
 clients = []
 clients_lock = threading.Lock()
+
+chave_cesar = 3  # Chave para a Cifra de César
+
+def cifra_cesar(mensagem, chave):
+    mensagem_criptografada = ""
+    for letra in mensagem:
+        if letra.isalpha():
+            maiuscula = letra.isupper()
+            letra = letra.lower()
+            codigo_ascii = ord(letra)
+            letra_criptografada = chr(((codigo_ascii - ord('a') + chave) % 26) + ord('a'))
+            if maiuscula:
+                letra_criptografada = letra_criptografada.upper()
+        else:
+            letra_criptografada = letra
+        mensagem_criptografada += letra_criptografada
+    return mensagem_criptografada
 
 def broadcast(data):
     with clients_lock:
         for client in list(clients):
             try:
-                client.sendall((data + '\n').encode())  # Adiciona delimitador
+                client.sendall((data + '\n').encode())
             except Exception as e:
                 print(f"Erro ao enviar para o cliente: {e}")
                 client.close()
@@ -34,11 +48,11 @@ def startServer():
         print(f"Conexão estabelecida com {client_address}")
         clients.append(client_socket)
 
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.encoder = B8ZSEncoder()
-        self.key, self.iv = load_keys()
         self.initUI()
 
     def initUI(self):
@@ -80,7 +94,6 @@ class MainWindow(QWidget):
 
         group1.setLayout(group1_layout)
 
-        # Add group boxes to the grid layout
         grid_layout.addWidget(group1, 0, 0)
         grid_layout.addWidget(group2, 1, 0)
 
@@ -100,20 +113,22 @@ class MainWindow(QWidget):
         text = self.text_input.text()
 
         # Encripta
-        encrypted = encrypt(text, self.key, self.iv)
+        encrypted = cifra_cesar(text, chave_cesar)
 
         # Binariza
-        binary = ''.join(format(e, '08b') for e in encrypted)
+        binary = ''.join(format(ord(c), '08b') for c in encrypted)
 
         # Codifica
         coded = self.encoder.encode(binary)
         # Remova a linha redundante coded_str e envie diretamente
         broadcast(coded)  # coded já é a string com vírgulas
+        
         # Atualize a UI conforme necessário
-         # Display results in the interface
-        self.encrypted_label.setText(f"Encrypted: {encrypted}")
-        self.binary_label.setText(f"Binary: {binary}")
-        self.coded_label.setText(f"Encoded Signal: {coded}")
+        # Display results in the interface
+        self.encrypted_label.setText(f"Criptografado (César): {encrypted}")
+        self.binary_label.setText(f"Binário: {binary}")
+        self.coded_label.setText(f"Codificado (B8ZS): {coded}")
+        
 
 def main():
     app = QApplication([])
@@ -121,7 +136,6 @@ def main():
     window.show()
     threading.Thread(target=startServer, daemon=True).start()
     app.exec_()
-
 
 if __name__ == "__main__":
     main()

@@ -10,12 +10,28 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtGui import QCursor
 
+chave_cesar = 3  # Chave para a Cifra de César
+
+def decifra_cesar(mensagem_criptografada, chave):
+    mensagem_original = ""
+    for letra in mensagem_criptografada:
+        if letra.isalpha():
+            maiuscula = letra.isupper()
+            letra = letra.lower()
+            codigo_ascii = ord(letra)
+            letra_original = chr(((codigo_ascii - ord('a') - chave) % 26) + ord('a'))
+            if maiuscula:
+                letra_original = letra_original.upper()
+        else:
+            letra_original = letra
+        mensagem_original += letra_original
+    return mensagem_original
+
 class MainWindow(QWidget):
     new_message = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
-        self.key, self.iv = load_keys()
         self.decoder = B8ZSDecoder()
         self.client_socket = None
         self.initUI()
@@ -65,7 +81,6 @@ class MainWindow(QWidget):
 
     def on_submit(self):
         coded_str = self.text_input.text()  
-        # Exemplo de string codificada (0,1,-1...) em formato '0 1 0 -1...'
         coded_list = list(map(int, coded_str.split()))
         decoded_bin = self.decoder.decode(coded_list)
         print(f"Decoded binary: {decoded_bin}")
@@ -98,14 +113,9 @@ class MainWindow(QWidget):
                 message, buffer = buffer.split('\n', 1)
                 decoded_bin = self.decoder.decode(message)
                 try:
-                    byte_array = bytearray()
-                    for i in range(0, len(decoded_bin), 8):
-                        byte_str = decoded_bin[i:i+8]
-                        if len(byte_str) < 8:
-                            continue  # Ou trate bytes incompletos
-                        byte_array.append(int(byte_str, 2))
-                    encrypted_bytes = bytes(byte_array)
-                    decrypted_message = decrypt(encrypted_bytes, self.key, self.iv)
+                    # Converte de binário para texto (ASCII Estendido)
+                    decrypted_message = ''.join(chr(int(decoded_bin[i:i+8], 2)) for i in range(0, len(decoded_bin), 8))
+                    decrypted_message = decifra_cesar(decrypted_message, chave_cesar)
                     self.new_message.emit(decrypted_message)
                     self.label_decoded.setText(decrypted_message)
                 except Exception as e:
