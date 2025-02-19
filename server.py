@@ -7,7 +7,6 @@ from PyQt5.QtCore import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-
 host = socket.gethostbyname(socket.gethostname())
 port = 65432
 
@@ -122,7 +121,8 @@ class MainWindow(QWidget):
     # Na função on_submit:
     def on_submit(self):
         text = self.text_input.text()
-
+        if text == "DEBUG":
+            text = '\x00'
         # Encripta
         encrypted = cifra_cesar(text, chave_cesar)
 

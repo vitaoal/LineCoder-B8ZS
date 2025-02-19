@@ -1,5 +1,4 @@
 # python
-from crypt_tools import *
 from b8zse import B8ZSDecoder  # [b8zse.py](b8zse.py)
 import socket
 import threading
