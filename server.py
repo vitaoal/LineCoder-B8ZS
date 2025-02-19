@@ -4,6 +4,9 @@ from b8zse import B8ZSEncoder
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
 
 host = socket.gethostbyname(socket.gethostname())
 port = 65432
@@ -94,6 +97,14 @@ class MainWindow(QWidget):
 
         group1.setLayout(group1_layout)
 
+        # Grupo 2: Exibir gráfico dos sinais
+        group2 = QGroupBox('Gráfico dos Sinais (Binário)')
+        group2_layout = QVBoxLayout()
+        self.fig = Figure(figsize=(5, 4))
+        self.canvas = FigureCanvas(self.fig)
+        group2_layout.addWidget(self.canvas)
+        group2.setLayout(group2_layout)
+
         grid_layout.addWidget(group1, 0, 0)
         grid_layout.addWidget(group2, 1, 0)
 
@@ -120,7 +131,6 @@ class MainWindow(QWidget):
 
         # Codifica
         coded = self.encoder.encode(binary)
-        # Remova a linha redundante coded_str e envie diretamente
         broadcast(coded)  # coded já é a string com vírgulas
         
         # Atualize a UI conforme necessário
@@ -128,6 +138,35 @@ class MainWindow(QWidget):
         self.encrypted_label.setText(f"Criptografado (César): {encrypted}")
         self.binary_label.setText(f"Binário: {binary}")
         self.coded_label.setText(f"Codificado (B8ZS): {coded}")
+
+        # Gera os dados para o gráfico.
+        # Mensagem não decodificada: a representação binária ("binary")
+        binary_nd = [int(bit) for bit in binary]
+        
+        # Tenta converter o sinal codificado (B8ZS) em uma lista de bits.
+        # Supondo que "coded" seja uma string com dígitos separados por vírgula.
+        try:
+            binary_coded = [int(bit.strip()) for bit in coded.split(',')]
+        except Exception:
+            binary_coded = []
+        
+        # Atualiza o gráfico no grupo 2
+        self.fig.clf()  # Limpa a figura
+
+        ax1 = self.fig.add_subplot(211)
+        ax1.stem(range(len(binary_nd)), binary_nd, linefmt='b-', markerfmt='bo', basefmt=" ")
+        ax1.set_title("Mensagem Não Decodificada (Binário)")
+        ax1.set_ylim(-0.5, 1.5)
+        ax1.set_ylabel("Bit")
+        
+        ax2 = self.fig.add_subplot(212)
+        ax2.stem(range(len(binary_coded)), binary_coded, linefmt='r-', markerfmt='ro', basefmt=" ")
+        ax2.set_title("Sinal Codificado (B8ZS)")
+        ax2.set_ylim(-0.5, 1.5)
+        ax2.set_xlabel("Índice")
+        ax2.set_ylabel("Bit")
+
+        self.canvas.draw()
         
 
 def main():

@@ -116,7 +116,7 @@ class MainWindow(QWidget):
                     # Converte de binário para texto (ASCII Estendido)
                     decrypted_message = ''.join(chr(int(decoded_bin[i:i+8], 2)) for i in range(0, len(decoded_bin), 8))
                     decrypted_message = decifra_cesar(decrypted_message, chave_cesar)
-                    self.new_message.emit(decrypted_message)
+                    self.new_message.emit(decoded_bin)
                     self.label_decoded.setText(decrypted_message)
                 except Exception as e:
                     print(f"Erro ao processar mensagem: {e}")
